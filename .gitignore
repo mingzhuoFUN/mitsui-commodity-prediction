@@ -20,6 +20,7 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 .venv/
+*.egg-info/
 .claude/
 ev-fork-of-mitsui-commodity-prediction-challenge.ipynb
 
