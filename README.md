@@ -98,6 +98,16 @@ notebooks/mitsui_competition_colab.ipynb
 
 该 notebook 会从 GitHub 安装项目、下载 Kaggle 数据、运行测试和冒烟训练、执行完整 424 目标验证、用全部数据训练提交模型，并初始化 competition inference server。
 
+忠实复现入口：
+
+```text
+notebooks/mitsui_original_model_reproduction_colab.ipynb
+```
+
+该版本保持最初上传 notebook 的目标重建、特征、三基础模型、XGBoost
+元模型和推理结构，仅调整 Colab 认证、数据路径和线程数量。它用于复现原
+notebook 的 Kaggle 线上结果，与工程化实验模型分开。
+
 ## 安装
 
 ```powershell
