@@ -8,3 +8,4 @@ pytest>=8.0
 nbformat>=5.10
 polars>=1.0
 grpcio>=1.60
+kaggle>=2.0
