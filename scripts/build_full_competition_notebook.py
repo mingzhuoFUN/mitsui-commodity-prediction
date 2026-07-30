@@ -52,20 +52,33 @@ in causal form."""),
 %env PYTHONPATH=src"""),
         md("""## 2. Competition data
 
-Upload `kaggle.json` only to the runtime. Never commit it."""),
+Recommended authentication: add the current `KGAT_...` token to Colab Secrets
+with the name `KAGGLE_API_TOKEN` and enable notebook access. A legacy
+`kaggle.json` upload remains available as a fallback. Never place either
+credential in GitHub or a notebook cell."""),
         code("""from pathlib import Path
 import os
 DATA_DIR = Path("data/raw")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 if not (DATA_DIR / "train.csv").exists():
-    from google.colab import files
-    uploaded = files.upload()
-    token_file = next(iter(uploaded))
-    kaggle_dir = Path.home() / ".kaggle"
-    kaggle_dir.mkdir(exist_ok=True)
-    (kaggle_dir / "kaggle.json").write_bytes(uploaded[token_file])
-    os.chmod(kaggle_dir / "kaggle.json", 0o600)
+    try:
+        from google.colab import userdata
+        api_token = userdata.get("KAGGLE_API_TOKEN")
+    except Exception:
+        api_token = None
+
+    if api_token:
+        os.environ["KAGGLE_API_TOKEN"] = api_token
+    else:
+        from google.colab import files
+        print("No KAGGLE_API_TOKEN secret found; upload legacy kaggle.json.")
+        uploaded = files.upload()
+        token_file = next(iter(uploaded))
+        kaggle_dir = Path.home() / ".kaggle"
+        kaggle_dir.mkdir(exist_ok=True)
+        (kaggle_dir / "kaggle.json").write_bytes(uploaded[token_file])
+        os.chmod(kaggle_dir / "kaggle.json", 0o600)
     !kaggle competitions download -c mitsui-commodity-prediction-challenge -p data/raw
     !unzip -q -o data/raw/mitsui-commodity-prediction-challenge.zip -d data/raw
 

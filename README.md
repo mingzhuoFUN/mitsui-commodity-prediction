@@ -109,6 +109,9 @@ $env:PYTHONPATH="src"
 
 竞赛数据解压到 `data/raw/`。CSV、ZIP、模型、输出和凭证由 `.gitignore` 排除。
 
+Colab 推荐将 Kaggle 新版 `KGAT_...` token 保存为名为
+`KAGGLE_API_TOKEN` 的 Secret。Legacy `kaggle.json` 仅作为备用。
+
 ## 运行
 
 测试：
