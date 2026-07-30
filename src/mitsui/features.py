@@ -26,6 +26,8 @@ def make_target_features(
     market: pd.DataFrame,
     pair: str,
     config: FeatureConfig = FeatureConfig(),
+    label: pd.Series | None = None,
+    horizon: int | None = None,
 ) -> pd.DataFrame:
     """Create causal features for one target using only its pair columns.
 
@@ -65,6 +67,16 @@ def make_target_features(
             mean = spread.rolling(window=window, min_periods=max(2, window // 3)).mean()
             std = spread.rolling(window=window, min_periods=max(2, window // 3)).std()
             features[f"pair__spread_zscore_{window}"] = (spread - mean) / std.replace(0, np.nan)
+
+    if label is not None:
+        if horizon is None:
+            raise ValueError("horizon is required when label features are enabled")
+        aligned_label = pd.to_numeric(label, errors="coerce").reindex(market.index)
+        reveal_delay = int(horizon) + 1
+        for extra_lag in (0, 1, 2, 5):
+            features[f"label__available_{extra_lag}"] = aligned_label.shift(
+                reveal_delay + extra_lag
+            )
 
     result = pd.DataFrame(features, index=market.index)
     return result.replace([np.inf, -np.inf], np.nan)

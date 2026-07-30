@@ -4,6 +4,7 @@ data/interim/
 data/processed/
 *.csv
 *.zip
+*.parquet
 lagged_test_labels/
 kaggle_evaluation/
 
