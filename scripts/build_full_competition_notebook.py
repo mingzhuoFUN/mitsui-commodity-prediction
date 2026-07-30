@@ -49,7 +49,7 @@ in causal form."""),
         code("""!git clone https://github.com/mingzhuoFUN/mitsui-commodity-prediction.git
 %cd mitsui-commodity-prediction
 !pip -q install -r requirements.txt
-%env PYTHONPATH=src"""),
+!pip -q install -e ."""),
         md("""## 2. Competition data
 
 Recommended authentication: add the current `KGAT_...` token to Colab Secrets
