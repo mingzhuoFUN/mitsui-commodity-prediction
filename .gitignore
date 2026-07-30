@@ -1,0 +1,27 @@
+# Competition data and archives
+data/raw/
+data/interim/
+data/processed/
+*.csv
+*.zip
+lagged_test_labels/
+kaggle_evaluation/
+
+# Training artifacts
+models/
+outputs/
+*.pkl
+*.joblib
+
+# Python and notebook noise
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+.claude/
+ev-fork-of-mitsui-commodity-prediction-challenge.ipynb
+
+# Secrets
+kaggle.json
+.env
