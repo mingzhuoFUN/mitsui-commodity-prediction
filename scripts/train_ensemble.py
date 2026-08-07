@@ -16,7 +16,7 @@ from mitsui.validation import holdout_indices
 
 
 def main() -> None:
-    """Train, validate and optionally refit the 424-target stacked ensemble."""
+    """训练并验证 424 目标集成模型，也可使用全量数据重新拟合。"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/ensemble"))
@@ -29,14 +29,13 @@ def main() -> None:
     market = pd.read_csv(args.data_dir / "train.csv")
     labels = pd.read_csv(args.data_dir / "train_labels.csv")
     pairs = pd.read_csv(args.data_dir / "target_pairs.csv")
-    # Positional feature/label alignment is used below, so fail early instead
-    # of silently training against shifted dates.
+    # 后续按行位置对齐特征和标签，因此日期错位时必须尽早报错，
+    # 避免模型在不知情的情况下学习错误日期的标签。
     if not market["date_id"].equals(labels["date_id"]):
         raise ValueError("Market rows and official labels are not aligned")
 
     if args.fit_full:
-        # Submission models use every labeled row and therefore do not produce
-        # a holdout score in this invocation.
+        # 提交模型使用全部有标签数据，因此本次调用不会产生留出集分数。
         train_idx = market.index.to_numpy()
         valid_idx = None
     else:
@@ -56,7 +55,7 @@ def main() -> None:
 
     report = {"n_models": len(models), "fit_full": args.fit_full}
     if valid_idx is not None:
-        # Keep target columns in the model-produced order for metric alignment.
+        # 保持模型输出的目标列顺序，确保指标计算时严格对齐。
         pred = predict_stacked_models(models, market, labels, valid_idx)
         truth = labels.loc[valid_idx, pred.columns].copy()
         truth.index = pred.index

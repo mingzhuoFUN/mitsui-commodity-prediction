@@ -21,10 +21,10 @@ from .features import FeatureConfig, make_target_features
 
 @dataclass
 class StackedTargetModel:
-    """Serializable training result for one of the 424 prediction targets.
+    """单个预测目标的可序列化训练结果。
 
-    Besides fitted estimators, the bundle stores the exact pair, horizon and
-    feature order needed to recreate the training input during inference.
+    除拟合后的模型外，该对象还保存资产 pair、预测周期和特征顺序，
+    以便推理阶段准确重建训练时的输入结构。
     """
 
     target: str
@@ -37,7 +37,7 @@ class StackedTargetModel:
 
 
 def _model_factory(name: str, random_state: int = 42) -> Callable[[], RegressorMixin]:
-    """Return a constructor so every OOF fold receives a fresh estimator."""
+    """返回模型构造器，确保每个 OOF 折都使用全新的模型实例。"""
     if name == "ridge":
         return lambda: Pipeline(
             [
@@ -57,8 +57,8 @@ def _model_factory(name: str, random_state: int = 42) -> Callable[[], RegressorM
                         max_depth=6,
                         min_samples_leaf=8,
                         max_features=0.8,
-                        # Parallelism is controlled outside individual models
-                        # to avoid oversubscribing Colab CPU cores.
+                        # 在模型外部统一控制并行度，避免 Colab CPU 核心
+                        # 因嵌套并行而过度占用。
                         n_jobs=1,
                         random_state=random_state,
                     ),
@@ -110,11 +110,10 @@ def fit_stacked_models(
     max_targets: int | None = None,
     feature_config: FeatureConfig = FeatureConfig(),
 ) -> dict[str, StackedTargetModel]:
-    """Fit per-target base learners and a leakage-safe OOF meta learner.
+    """为每个目标训练基础模型及无泄漏的 OOF 元模型。
 
-    The meta learner never sees predictions made by a base model on rows used
-    to fit that same base model. This is the key property that makes the
-    stacking score meaningful on chronological data.
+    元模型不会看到基础模型对自身训练样本生成的预测。
+    这是 stacking 在时间序列数据上保持验证可信度的关键。
     """
     pairs = target_pairs.set_index("target")
     targets = target_columns(labels.columns)
@@ -129,19 +128,17 @@ def fit_stacked_models(
         x = make_target_features(
             market, pair, feature_config, label=y, horizon=horizon
         )
-        # Preserve the caller's chronological order while removing rows whose
-        # official target is unavailable.
+        # 保持调用方提供的时间顺序，同时移除官方标签缺失的行。
         usable = train_indices[y.iloc[train_indices].notna().to_numpy()]
         if len(usable) < 100:
             continue
 
         x_train = x.iloc[usable]
         y_train = y.iloc[usable]
-        # Rows not covered by an OOF validation fold remain NaN and are not
-        # allowed into meta-model training.
+        # 未被任何 OOF 验证折覆盖的行保持 NaN，不参与元模型训练。
         oof = np.full((len(usable), len(base_names)), np.nan)
-        # gap=horizon separates each fold's training tail from its validation
-        # head, reducing overlap between forward-return label windows.
+        # gap=horizon 将每折训练集末尾与验证集开头隔开，
+        # 减少远期收益标签窗口发生重叠。
         splitter = TimeSeriesSplit(n_splits=n_splits, gap=horizon)
         for fold_train, fold_valid in splitter.split(x_train):
             for model_idx, name in enumerate(base_names):
@@ -149,14 +146,13 @@ def fit_stacked_models(
                 model.fit(x_train.iloc[fold_train], y_train.iloc[fold_train])
                 oof[fold_valid, model_idx] = model.predict(x_train.iloc[fold_valid])
 
-        # Require a prediction from every base learner for a complete stacking
-        # feature vector.
+        # 只有全部基础模型都给出预测时，才构成完整的 stacking 特征向量。
         meta_rows = np.isfinite(oof).all(axis=1)
         meta = Ridge(alpha=1.0)
         meta.fit(oof[meta_rows], y_train.iloc[meta_rows])
 
-        # OOF models exist only to train the meta learner. Refit each base
-        # learner on all usable rows for the model used at inference time.
+        # OOF 折模型只用于训练元模型；推理使用的基础模型需要在全部
+        # 可用训练行上重新拟合。
         base_models: list[RegressorMixin] = []
         for name in base_names:
             model = _model_factory(name)()
@@ -181,10 +177,10 @@ def predict_stacked_models(
     labels: pd.DataFrame,
     indices: np.ndarray,
 ) -> pd.DataFrame:
-    """Predict selected rows with the stored base and meta models."""
+    """使用已保存的基础模型和元模型预测指定行。"""
     predictions: dict[str, np.ndarray] = {}
-    # Multiple targets can share the same pair. Cache pair-only market features
-    # once, then attach target-specific delayed-label features below.
+    # 多个目标可能共享同一资产 pair，因此先缓存只依赖 pair 的市场特征，
+    # 再为各目标添加专属的延迟标签特征。
     pair_feature_cache: dict[str, pd.DataFrame] = {}
     for target, bundle in models.items():
         label = labels[target] if target in labels else pd.Series(np.nan, index=market.index)
@@ -197,7 +193,7 @@ def predict_stacked_models(
             x[f"label__available_{extra_lag}"] = aligned_label.shift(
                 reveal_delay + extra_lag
             )
-        # Restore the exact feature schema seen during fitting.
+        # 恢复拟合时使用的精确特征结构和列顺序。
         x = x.reindex(columns=bundle.feature_columns)
         base_predictions = np.column_stack(
             [model.predict(x.iloc[indices]) for model in bundle.base_models]
@@ -209,7 +205,7 @@ def predict_stacked_models(
 def save_stacked_models(
     models: dict[str, StackedTargetModel], path: str | Path
 ) -> None:
-    """Serialize all target bundles as one submission-time artifact."""
+    """将全部目标模型打包保存为一个提交阶段使用的文件。"""
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("wb") as handle:
@@ -217,6 +213,6 @@ def save_stacked_models(
 
 
 def load_stacked_models(path: str | Path) -> dict[str, StackedTargetModel]:
-    """Load the artifact created by :func:`save_stacked_models`."""
+    """加载由 :func:`save_stacked_models` 创建的模型文件。"""
     with Path(path).open("rb") as handle:
         return pickle.load(handle)
