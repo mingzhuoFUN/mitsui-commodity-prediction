@@ -50,21 +50,15 @@ flowchart LR
 
 所有 `feature[t]` 仅依赖时间不晚于 `t` 的信息，不使用未来差分、负数 shift 或 backward fill。
 
-## 验证结果
-
-| 模型 | 目标数 | 验证天数 | IC Sharpe | Mean Daily IC |
-|---|---:|---:|---:|---:|
-| Ridge baseline | 424 | 252 | 0.1466 | 0.0242 |
-| LGBM + RF + XGB OOF stacking | 424 | 252 | **0.2005** | **0.0434** |
-
-> 表中结果来自本地时间留出验证，不代表 Kaggle Leaderboard 分数。
-
-结果口径：
+## 验证设计
 
 - 使用官方 `train_labels.csv`；
 - 验证集为时间轴末尾 252 天，训练与验证之间使用 4 天 embargo；
+- 基础模型通过时间序列 OOF 预测训练 stacking 元模型；
+- 使用 Daily IC 与 IC Sharpe 评估横截面排序能力；
 - 基础模型随机种子固定为 42；
-- 完整 Colab 运行后应同时记录 Python、依赖版本、硬件和执行日志。
+- 本地验证与 Kaggle Leaderboard 分开记录，不在不同环境间直接比较分数；
+- 每次正式实验应同时记录数据版本、Python、依赖、硬件和执行日志。
 
 完整 local gateway 已连续运行 134 个测试日，并检查：
 
