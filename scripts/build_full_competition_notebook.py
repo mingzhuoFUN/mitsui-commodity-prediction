@@ -31,9 +31,8 @@ The pipeline combines target-pair causal features, LightGBM, Random Forest,
 XGBoost, time-series OOF stacking and the Kaggle inference server."""),
         md("## 1. Clone and install"),
         code("""REPO_URL = "https://github.com/mingzhuoFUN/mitsui-commodity-prediction.git"
-# The complete pipeline currently lives on this remote branch. Change to
-# "main" after the feature branch is merged.
-REPO_REF = "agent/full-competition-pipeline"
+# Use the default production branch after this workflow is merged.
+REPO_REF = "main"
 !git clone --depth 1 --branch {REPO_REF} {REPO_URL}
 %cd mitsui-commodity-prediction
 !pip -q install -r requirements.txt
