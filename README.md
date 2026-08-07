@@ -196,6 +196,16 @@ Notebook 包含项目安装、Kaggle 数据下载、自动化测试、冒烟训�
 - 内存或时间不足：先完成 8-target smoke，再运行完整 424-target 训练；
 - runtime 中断：从 Google Drive 恢复已经保存的模型和指标。
 
+## 本地完整方法 Notebook
+
+[`notebooks/mitsui_complete_workflow.ipynb`](notebooks/mitsui_complete_workflow.ipynb)
+是一份不依赖 Colab 的单文件完整方法说明，可在本地 Jupyter、JupyterLab
+或 VS Code Notebook 中运行。它直接包含数据读取、特征工程、时间验证、
+三模型 OOF stacking、指标、模型保存和顺序推理代码，适合从头理解整个项目。
+
+默认仅训练 8 个目标进行快速检查；将 notebook 中的
+`RUN_FULL_TRAINING=True` 后可切换为完整 424 目标流程。
+
 ## 本地运行
 
 ```powershell
@@ -224,11 +234,13 @@ python scripts/run_local_gateway.py
 ```text
 notebooks/
   mitsui_competition_colab.ipynb  # 云端完整入口
+  mitsui_complete_workflow.ipynb  # 本地单文件完整方法
   mitsui_model_experiments_colab.ipynb # 模型实验入口
 scripts/
   train_baseline.py               # Ridge 基线
   train_ensemble.py               # 三模型 OOF stacking
   run_local_gateway.py            # 连续历史在线推理
+  build_complete_workflow_notebook.py # 生成本地完整方法 notebook
   build_model_experiments_notebook.py # 生成模型实验 notebook
 src/mitsui/
   features.py                     # 因果特征
