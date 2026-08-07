@@ -1,2 +1,2 @@
-"""Utilities for the MITSUI commodity prediction project."""
+"""MITSUI 商品预测项目的核心工具包。"""
 

@@ -6,7 +6,11 @@ import pandas as pd
 
 
 def list_data_files(data_dir: str | Path) -> pd.DataFrame:
-    """Return a compact inventory of files in the official data directory."""
+    """返回官方数据目录的精简文件清单。
+
+    清单只读取文件元数据；如果仅为了检查目录就加载全部竞赛文件，
+    会在 Colab 中浪费大量内存。
+    """
     root = Path(data_dir)
     rows = []
     for path in sorted(root.rglob("*")):
@@ -24,7 +28,11 @@ def list_data_files(data_dir: str | Path) -> pd.DataFrame:
 
 
 def read_table(path: str | Path, **kwargs) -> pd.DataFrame:
-    """Read a CSV or parquet table by suffix."""
+    """根据扩展名读取 CSV 或 Parquet 表格。
+
+    将格式判断集中在这里，可让数据检查脚本同时支持两种格式，
+    而不必重复编写加载器选择逻辑。
+    """
     table_path = Path(path)
     suffix = table_path.suffix.lower()
     if suffix == ".csv":
@@ -35,6 +43,10 @@ def read_table(path: str | Path, **kwargs) -> pd.DataFrame:
 
 
 def target_columns(columns: list[str] | pd.Index) -> list[str]:
-    """Return competition target columns in numeric target order."""
+    """按照目标编号返回竞赛目标列。
+
+    字符串排序会把 ``target_10`` 放在 ``target_2`` 前面；
+    竞赛推理接口要求按目标编号排序。
+    """
     names = [str(column) for column in columns if str(column).startswith("target_")]
     return sorted(names, key=lambda name: int(name.split("_", maxsplit=1)[1]))

@@ -24,11 +24,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """在相同的时间留出集上训练 Ridge 基准模型。"""
     args = parse_args()
     market = pd.read_csv(args.data_dir / "train.csv")
     labels = pd.read_csv(args.data_dir / "train_labels.csv")
     pairs = pd.read_csv(args.data_dir / "target_pairs.csv")
 
+    # 如果日期没有对齐，市场第 t 行会错误匹配到其他日期的官方标签。
     if not market["date_id"].equals(labels["date_id"]):
         raise ValueError("train.csv and train_labels.csv date_id columns are not aligned")
 
@@ -44,6 +46,7 @@ def main() -> None:
         max_targets=args.max_targets,
     )
     predictions = predict_target_models(models, market, valid_idx)
+    # 计算跨目标指标前，真实值列必须与预测列及其顺序完全一致。
     truth = labels.loc[valid_idx, list(predictions.columns)].copy()
     truth.index = predictions.index
     dates = market.loc[valid_idx, "date_id"].to_numpy()

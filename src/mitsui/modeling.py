@@ -17,6 +17,8 @@ from .features import FeatureConfig, make_target_features
 
 @dataclass
 class TargetModel:
+    """保存单个目标的特征与模型契约所需的全部内容。"""
+
     target: str
     pair: str
     model: Pipeline
@@ -24,6 +26,7 @@ class TargetModel:
 
 
 def make_ridge(alpha: float = 10.0) -> Pipeline:
+    """构建包含缺失值填补和标准化的 Ridge 基准流水线。"""
     return Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median", keep_empty_features=True)),
@@ -43,7 +46,8 @@ def fit_target_models(
     max_targets: int | None = None,
     feature_config: FeatureConfig = FeatureConfig(),
 ) -> dict[str, TargetModel]:
-    """Fit one lightweight causal baseline model per official target."""
+    """为每个官方目标拟合一个轻量级因果基准模型。"""
+    # target_pairs 是目标名称与其对应市场列之间的权威映射。
     pairs = target_pairs.set_index("target")
     targets = target_columns(labels.columns)
     if max_targets is not None:
@@ -55,6 +59,8 @@ def fit_target_models(
         x_all = make_target_features(market, pair, feature_config)
         y_all = pd.to_numeric(labels[target], errors="coerce")
 
+        # 同时满足调用方提供的时间切分和标签可用性。
+        # 特征中的 NaN 由 sklearn 流水线处理。
         valid = np.zeros(len(market), dtype=bool)
         valid[train_indices] = True
         valid &= y_all.notna().to_numpy()
@@ -80,6 +86,8 @@ def predict_target_models(
     predictions: dict[str, np.ndarray] = {}
     for target, bundle in models.items():
         features = make_target_features(market, bundle.pair)
+        # 保存的列顺序属于模型契约的一部分。重新索引还能防止推理阶段
+        # 因特征顺序意外变化而产生错误。
         features = features.reindex(columns=bundle.feature_columns)
         predictions[target] = bundle.model.predict(features.iloc[indices])
     return pd.DataFrame(predictions, index=market.index[indices])
