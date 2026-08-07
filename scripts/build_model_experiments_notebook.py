@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 
-SOURCE = Path(r"E:\download\mitsui-commodity-prediction-challenge.ipynb")
-OUTPUT = Path("notebooks/mitsui_original_model_reproduction_colab.ipynb")
+SOURCE = Path("mitsui-model-development.ipynb")
+OUTPUT = Path("notebooks/mitsui_model_experiments_colab.ipynb")
 
 
 def markdown(source: str) -> dict:
@@ -26,14 +26,14 @@ def main() -> None:
     notebook = json.loads(SOURCE.read_text(encoding="utf-8"))
     setup = [
         markdown(
-            """# Original model reproduction in Colab
+            """# MITSUI model experiments in Colab
 
-This notebook preserves the uploaded model logic: reconstructed targets,
-lag/rolling/difference features, LightGBM + Random Forest + XGBoost, the
+This notebook contains an experimental modeling path with generated targets,
+lag/rolling/difference features, LightGBM + Random Forest + XGBoost, an
 XGBoost stacking meta-model, and the Mitsui inference server.
 
-Only environment changes are made: Colab authentication, paths, dependency
-installation, and a bounded training thread count.
+The Colab setup configures authentication, paths, dependencies and bounded
+training concurrency.
 """
         ),
         code(

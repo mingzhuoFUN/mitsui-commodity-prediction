@@ -1,2 +1,2 @@
-"""Utilities for the MITSUI commodity prediction reproduction."""
+"""Utilities for the MITSUI commodity prediction project."""
 

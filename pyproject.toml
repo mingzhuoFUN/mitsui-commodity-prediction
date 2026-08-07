@@ -3,10 +3,17 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mitsui-reproduction"
+name = "mitsui-commodity-modeling"
 version = "0.1.0"
-description = "Reproduction workspace for the MITSUI commodity prediction Kaggle competition."
+description = "End-to-end modeling pipeline for the MITSUI commodity prediction Kaggle competition."
 requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.4",
+    "lightgbm>=4.3",
+    "xgboost>=2.0,<4",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

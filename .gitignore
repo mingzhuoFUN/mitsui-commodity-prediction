@@ -22,7 +22,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .claude/
-ev-fork-of-mitsui-commodity-prediction-challenge.ipynb
+mitsui-model-development.ipynb
 
 # Secrets
 kaggle.json
