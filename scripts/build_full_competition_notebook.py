@@ -27,29 +27,24 @@ def main() -> None:
         md("""# MITSUI Commodity Prediction — Colab training and submission
 
 End-to-end training, validation and sequential inference for all 424 targets.
-The notebook uses the uploaded competition notebook as its blueprint: target
-pair features, LightGBM, Random Forest, XGBoost, stacking and the Kaggle
-inference server. The implementation fixes label alignment, future leakage and
-in-sample stacking while retaining that model architecture."""),
-        md("""## Blueprint mapping
-
-| Uploaded notebook section | Repository implementation |
-|---|---|
-| `get_data_for_day` and generated targets | official labels aligned by `date_id` |
-| `prepare_features_for_col/df` | `src/mitsui/features.py` |
-| LGBM + RF + XGB base learners | `src/mitsui/ensemble.py` |
-| XGB meta-model trained in-sample | time-series OOF Ridge meta-model |
-| `predict_on_test` | `src/mitsui/inference.py` |
-| `MitsuiInferenceServer` | `scripts/run_local_gateway.py` and final cells |
-
-The original negative shifts and backward fill are not retained because they
-read future rows. All positive lag, rolling, difference/spread concepts remain
-in causal form."""),
+The pipeline combines target-pair causal features, LightGBM, Random Forest,
+XGBoost, time-series OOF stacking and the Kaggle inference server."""),
         md("## 1. Clone and install"),
-        code("""!git clone https://github.com/mingzhuoFUN/mitsui-commodity-prediction.git
+        code("""REPO_URL = "https://github.com/mingzhuoFUN/mitsui-commodity-prediction.git"
+# Use the default production branch after this workflow is merged.
+REPO_REF = "main"
+!git clone --depth 1 --branch {REPO_REF} {REPO_URL}
 %cd mitsui-commodity-prediction
 !pip -q install -r requirements.txt
-!pip -q install -e ."""),
+!pip -q install -e .
+
+import sys
+from importlib.metadata import version
+import mitsui
+print("Python:", sys.version)
+print("mitsui:", mitsui.__file__)
+for package in ("pandas", "scikit-learn", "lightgbm", "xgboost"):
+    print(package, version(package))"""),
         md("""## 2. Competition data
 
 Recommended authentication: add the current `KGAT_...` token to Colab Secrets
@@ -128,11 +123,36 @@ json.loads(Path("outputs/ensemble_full/metrics.json").read_text())"""),
   --data-dir data/raw \\
   --output-dir outputs/ensemble_submit \\
   --fit-full"""),
-        md("## 9. Run the complete local Kaggle gateway"),
+        md("""## 9. Persist artifacts to Google Drive
+
+Colab runtimes are temporary. Mount Drive and copy the trained model, metrics
+and validation predictions before starting the gateway. The copy is verified
+by file existence and size."""),
+        code("""from google.colab import drive
+import shutil
+
+drive.mount("/content/drive")
+ARTIFACT_DIR = Path("/content/drive/MyDrive/mitsui-artifacts")
+ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+
+artifacts = {
+    Path("outputs/ensemble_submit/stacked_models.pkl"): "stacked_models.pkl",
+    Path("outputs/ensemble_submit/metrics.json"): "submission_metrics.json",
+    Path("outputs/ensemble_full/metrics.json"): "validation_metrics.json",
+    Path("outputs/ensemble_full/validation_predictions.csv"):
+        "validation_predictions.csv",
+}
+for source, destination_name in artifacts.items():
+    if source.exists():
+        destination = ARTIFACT_DIR / destination_name
+        shutil.copy2(source, destination)
+        assert destination.exists() and destination.stat().st_size > 0
+        print(destination, destination.stat().st_size, "bytes")"""),
+        md("## 10. Run the complete local Kaggle gateway"),
         code("""!python scripts/run_local_gateway.py \\
   --data-dir data/raw \\
   --model-path outputs/ensemble_submit/stacked_models.pkl"""),
-        md("""## 10. Competition rerun entrypoint
+        md("""## 11. Competition rerun entrypoint
 
 For a Kaggle submission, keep the trained model artifact in a Kaggle Dataset
 attached to the notebook, initialize `SequentialPredictor`, then serve it:"""),

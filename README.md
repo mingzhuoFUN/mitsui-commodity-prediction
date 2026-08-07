@@ -6,6 +6,9 @@
 
 面向多资产、多期限收益预测的时间序列建模系统。项目覆盖因果特征、无泄漏验证、三模型集成、424 目标推理以及 Kaggle inference server 全流程。
 
+> 当前状态：本地源码、单元测试和小规模训练已经验证。下述结果来自
+> 本地时间留出，不是 Kaggle public 或 private leaderboard 分数。
+
 ## 项目概览
 
 | 项目 | 内容 |
@@ -58,6 +61,13 @@ flowchart LR
 
 > 表中结果来自本地时间留出验证，不代表 Kaggle Leaderboard 分数。
 
+结果口径：
+
+- 使用官方 `train_labels.csv`；
+- 验证集为时间轴末尾 252 天，训练与验证之间使用 4 天 embargo；
+- 基础模型随机种子固定为 42；
+- 完整 Colab 运行后应同时记录 Python、依赖版本、硬件和执行日志。
+
 完整 local gateway 已连续运行 134 个测试日，并检查：
 
 - 连续市场历史缓存；
@@ -77,6 +87,16 @@ Notebook 包含项目安装、Kaggle 数据下载、自动化测试、冒烟训�
 2. 在 Colab Secrets 中添加 `KAGGLE_API_TOKEN`。
 3. 选择 GPU 或高内存运行时。
 4. 按顺序执行全部单元格。
+
+训练完成后，notebook 会将模型、指标和验证预测复制到
+`MyDrive/mitsui-artifacts/`，并确认文件存在且非空。
+
+常见问题：
+
+- Kaggle 返回 401/403：确认已经加入比赛，并给 notebook 开启 Secret 访问；
+- `No module named xgboost`：重新执行依赖安装单元；
+- 内存或时间不足：先完成 8-target smoke，再运行完整 424-target 训练；
+- runtime 中断：从 Google Drive 恢复已经保存的模型和指标。
 
 ## 本地运行
 
@@ -106,10 +126,12 @@ python scripts/run_local_gateway.py
 ```text
 notebooks/
   mitsui_competition_colab.ipynb  # 云端完整入口
+  mitsui_model_experiments_colab.ipynb # 模型实验入口
 scripts/
   train_baseline.py               # Ridge 基线
   train_ensemble.py               # 三模型 OOF stacking
   run_local_gateway.py            # 连续历史在线推理
+  build_model_experiments_notebook.py # 生成模型实验 notebook
 src/mitsui/
   features.py                     # 因果特征
   ensemble.py                     # 基础模型、OOF 与 stacking
