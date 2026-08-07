@@ -1,166 +1,111 @@
 # MITSUI&CO. Commodity Prediction Challenge
 
-本项目用于训练 MITSUI&CO. Commodity Prediction Challenge 的 424 个多期限收益与收益差目标。
+[![Kaggle](https://img.shields.io/badge/Kaggle-Competition-20BEFF?logo=kaggle&logoColor=white)](https://www.kaggle.com/competitions/mitsui-commodity-prediction-challenge)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mingzhuoFUN/mitsui-commodity-prediction/blob/main/notebooks/mitsui_competition_colab.ipynb)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-项目以最初的竞赛 notebook 为模型蓝本，保留其 target pair 特征、LightGBM、Random Forest、XGBoost、stacking 和 Kaggle inference server 主线。工程代码对标签对齐、时间序列泄漏和 stacking 训练方式进行严格处理，但不改变这套核心模型思路。
+闈㈠悜澶氳祫浜с€佸鏈熼檺鏀剁泭棰勬祴鐨勬椂闂村簭鍒楀缓妯＄郴缁熴€傞」鐩鐩栧洜鏋滅壒寰併€佹棤娉勬紡楠岃瘉銆佷笁妯″瀷闆嗘垚銆?24 鐩爣鎺ㄧ悊浠ュ強 Kaggle inference server 鍏ㄦ祦绋嬨€?
+## 椤圭洰姒傝
 
-## 完整建模思路
+| 椤圭洰 | 鍐呭 |
+|---|---|
+| 浠诲姟 | 棰勬祴鑲＄エ銆佸姹囥€丩ME 涓?JPX 甯傚満鐨勬敹鐩婂強鏀剁泭宸?|
+| 棰勬祴瑙勬ā | 424 涓鏈熼檺鐩爣 |
+| 鏍稿績鎸囨爣 | Daily IC / IC Sharpe |
+| 鍩虹妯″瀷 | Ridge銆丩ightGBM銆丷andom Forest銆乆GBoost |
+| 闆嗘垚鏂瑰紡 | 鏃堕棿搴忓垪 OOF 棰勬祴 + Ridge stacking |
+| 鎺ㄨ崘鍏ュ彛 | [鍦?Google Colab 涓繍琛屽畬鏁存祦绋媇(https://colab.research.google.com/github/mingzhuoFUN/mitsui-commodity-prediction/blob/main/notebooks/mitsui_competition_colab.ipynb) |
 
-```text
-官方市场数据与标签对齐
-        ↓
-目标 pair 因果特征 + 延迟可用的历史标签特征
-        ↓
-带 embargo 的时间序列切分
-        ↓
-LightGBM / Random Forest / XGBoost
-        ↓
-时间序列 OOF 预测
-        ↓
-Ridge stacking 元模型
-        ↓
-424 目标预测与 Daily IC / IC Sharpe
-        ↓
-连续历史 Kaggle inference server
+## 寤烘ā娴佺▼
+
+```mermaid
+flowchart LR
+    A["甯傚満鏁版嵁"] --> C["鎸?date_id 瀵归綈"]
+    B["424 涓畼鏂规爣绛?] --> C
+    C --> D["鍥犳灉鏀剁泭涓庝环宸壒寰?]
+    D --> E["鏃堕棿鍒囧垎 + 4 鏃?Embargo"]
+    E --> F["LightGBM"]
+    E --> G["Random Forest"]
+    E --> H["XGBoost"]
+    F --> I["鏃堕棿搴忓垪 OOF"]
+    G --> I
+    H --> I
+    I --> J["Ridge Stacking"]
+    J --> K["424 鐩爣棰勬祴"]
+    K --> L["Daily IC / IC Sharpe"]
+    K --> M["Kaggle Inference Server"]
 ```
 
-### 数据和标签
+## 鐗瑰緛浣撶郴
 
-- `train.csv`：股票、外汇、LME 与 JPX 市场时间序列。
-- `train_labels.csv`：正式训练使用的 424 个官方标签。
-- `target_pairs.csv`：每个目标对应的预测期限和一个或两个资产。
-- `label_lags_1` 至 `label_lags_4`：推理阶段刚刚变得可用的历史标签。
+| 鐗瑰緛缁?| 鍐呭 |
+|---|---|
+| 浠锋牸鐘舵€?| 褰撳墠瀵规暟浠锋牸 |
+| 鍔ㄩ噺 | 1銆?銆?銆?銆?0銆?0 鏃ュ鏁版敹鐩?|
+| 婊氬姩缁熻 | 5銆?0銆?0 鏃ユ敹鐩婂潎鍊间笌娉㈠姩鐜?|
+| Pair 鐗瑰緛 | 涓よ祫浜у鏁颁环宸€佷环宸彉鍖栥€佹粴鍔?z-score |
+| 鍘嗗彶鏍囩 | 鎸夌洰鏍?horizon 妯℃嫙寤惰繜鍙敤鐨勬爣绛?|
 
-训练时 `X[t]` 与官方 `Y[t]` 按 `date_id` 对齐。价格重建标签只用于检查公式，不替代官方标签。
+鎵€鏈?`feature[t]` 浠呬緷璧栨椂闂翠笉鏅氫簬 `t` 鐨勪俊鎭紝涓嶄娇鐢ㄦ湭鏉ュ樊鍒嗐€佽礋鏁?shift 鎴?backward fill銆?
+## 楠岃瘉缁撴灉
 
-### 因果特征
-
-每个目标使用其 pair 资产的：
-
-- 当前对数价格；
-- 1、2、3、5、10、20 日对数收益；
-- 5、20、60 日滚动收益均值与波动率；
-- 两资产对数价差、价差变化和滚动 z-score；
-- 按目标 horizon 模拟延迟公开的历史标签。
-
-所有 `feature[t]` 只依赖时间不晚于 `t` 的信息。不使用负数 shift、未来差分或 backward fill。
-
-### 验证与 stacking
-
-验证集固定在时间轴末尾，训练与验证之间设置 4 天 embargo。基础模型的 stacking 输入来自 `TimeSeriesSplit` 生成的 OOF 预测，元模型不会看到基础模型对自身训练样本的拟合预测。
-
-最终比较：
-
-- Ridge baseline；
-- LightGBM；
-- Random Forest；
-- XGBoost；
-- 三模型 OOF stacking。
-
-## 已验证结果
-
-| 模型 | 目标数 | 验证天数 | IC Sharpe | Mean Daily IC |
+| 妯″瀷 | 鐩爣鏁?| 楠岃瘉澶╂暟 | IC Sharpe | Mean Daily IC |
 |---|---:|---:|---:|---:|
 | Ridge baseline | 424 | 252 | 0.1466 | 0.0242 |
 | LGBM + RF + XGB OOF stacking | 424 | 252 | **0.2005** | **0.0434** |
 
-以上是本地时间留出结果，不是 Kaggle leaderboard 分数。
+> 琛ㄤ腑缁撴灉鏉ヨ嚜鏈湴鏃堕棿鐣欏嚭楠岃瘉锛屼笉浠ｈ〃 Kaggle Leaderboard 鍒嗘暟銆?
+瀹屾暣 local gateway 宸茶繛缁繍琛?134 涓祴璇曟棩锛屽苟妫€鏌ワ細
 
-完整 Kaggle local gateway 已成功运行 134 个测试日，验证了：
+- 杩炵画甯傚満鍘嗗彶缂撳瓨锛?- `label_date_id` 鍘嗗彶鏍囩鏇存柊锛?- 姣忔壒 424 鍒楅娴嬪強鍒楅『搴忥紱
+- competition inference server 璋冪敤閾捐矾銆?
+## Google Colab
 
-- 连续市场历史缓存；
-- `label_date_id` 历史标签更新；
-- 每批 424 列预测及正确列顺序；
-- competition inference server 调用流程。
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mingzhuoFUN/mitsui-commodity-prediction/blob/main/notebooks/mitsui_competition_colab.ipynb)
 
-## 项目结构
+Notebook 鍖呭惈椤圭洰瀹夎銆並aggle 鏁版嵁涓嬭浇銆佽嚜鍔ㄥ寲娴嬭瘯銆佸啋鐑熻缁冦€佸畬鏁撮獙璇併€佸叏閲忚缁冨拰 inference server 鍒濆鍖栥€?
+杩愯鍓嶏細
 
-```text
-notebooks/          # Colab/Kaggle 完整训练与提交入口
-scripts/
-  train_baseline.py # Ridge 基准
-  train_ensemble.py # 三模型 OOF stacking
-  run_local_gateway.py
-src/mitsui/
-  features.py       # 因果特征
-  ensemble.py       # 基础模型、OOF 与 stacking
-  inference.py      # 连续历史在线推理
-  metric.py         # Daily IC 与 IC Sharpe
-  validation.py     # 时间切分与 embargo
-tests/              # 指标、泄漏和推理测试
-```
-
-主要运行入口：
-
-```text
-notebooks/mitsui_competition_colab.ipynb
-```
-
-该 notebook 会从 GitHub 安装项目、下载 Kaggle 数据、运行测试和冒烟训练、执行完整 424 目标验证、用全部数据训练提交模型，并初始化 competition inference server。
-
-## 安装
+1. 鍦?Kaggle 椤甸潰鎺ュ彈绔炶禌瑙勫垯銆?2. 鍦?Colab Secrets 涓坊鍔?`KAGGLE_API_TOKEN`銆?3. 閫夋嫨 GPU 鎴栭珮鍐呭瓨杩愯鏃躲€?4. 鎸夐『搴忔墽琛屽叏閮ㄥ崟鍏冩牸銆?
+## 鏈湴杩愯
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 $env:PYTHONPATH="src"
-```
-
-竞赛数据解压到 `data/raw/`。CSV、ZIP、模型、输出和凭证由 `.gitignore` 排除。
-
-Colab 推荐将 Kaggle 新版 `KGAT_...` token 保存为名为
-`KAGGLE_API_TOKEN` 的 Secret。Legacy `kaggle.json` 仅作为备用。
-
-## 运行
-
-测试：
-
-```powershell
 pytest
 ```
 
-小规模检查：
+璁粌鍩虹嚎涓庨泦鎴愭ā鍨嬶細
 
 ```powershell
-python scripts/train_ensemble.py `
-  --data-dir data/raw `
-  --output-dir outputs/ensemble_smoke `
-  --valid-size 128 `
-  --max-targets 8
+python scripts/train_baseline.py
+python scripts/train_ensemble.py
 ```
 
-完整时间验证：
-
+杩愯鏈湴鎺ㄧ悊缃戝叧锛?
 ```powershell
-python scripts/train_ensemble.py `
-  --data-dir data/raw `
-  --output-dir outputs/ensemble_full `
-  --valid-size 252
+python scripts/run_local_gateway.py
 ```
 
-使用全部训练数据拟合提交模型：
+## 椤圭洰缁撴瀯
 
-```powershell
-python scripts/train_ensemble.py `
-  --data-dir data/raw `
-  --output-dir outputs/ensemble_submit `
-  --fit-full
+```text
+notebooks/
+  mitsui_competition_colab.ipynb  # 浜戠瀹屾暣鍏ュ彛
+scripts/
+  train_baseline.py               # Ridge 鍩虹嚎
+  train_ensemble.py               # 涓夋ā鍨?OOF stacking
+  run_local_gateway.py            # 杩炵画鍘嗗彶鍦ㄧ嚎鎺ㄧ悊
+src/mitsui/
+  features.py                     # 鍥犳灉鐗瑰緛
+  ensemble.py                     # 鍩虹妯″瀷銆丱OF 涓?stacking
+  inference.py                    # 鎺ㄧ悊鐘舵€佺鐞?  metric.py                       # Daily IC 涓?IC Sharpe
+  validation.py                   # 鏃堕棿鍒囧垎涓?embargo
+tests/                            # 鎸囨爣銆佹硠婕忎笌鎺ㄧ悊娴嬭瘯
 ```
 
-本地运行 Kaggle gateway：
+## 宸ョ▼浜偣
 
-```powershell
-python scripts/run_local_gateway.py `
-  --data-dir data/raw `
-  --model-path outputs/ensemble_submit/stacked_models.pkl
-```
-
-## 数据安全
-
-不要提交：
-
-- `train.csv`、`test.csv` 和其他竞赛数据；
-- Kaggle ZIP；
-- `kaggle.json`、token 或 `.env`；
-- `.pkl` 模型和训练输出。
+- 璁粌銆侀獙璇佸拰鍦ㄧ嚎鎺ㄧ悊鍏变韩鍚屼竴濂楀洜鏋滅壒寰侀€昏緫銆?- Embargo 涓庢椂闂村簭鍒?OOF 鍏卞悓鎺у埗娉勬紡椋庨櫓銆?- 鎺ㄧ悊妯″潡缁存姢杩炵画鍘嗗彶鐘舵€侊紝閫傞厤閫愭壒娆?competition gateway銆?- 鍗曞厓娴嬭瘯瑕嗙洊鏍囩鏂瑰悜銆佸垪椤哄簭銆佺姸鎬佹洿鏂板拰鎸囨爣璁＄畻銆?
