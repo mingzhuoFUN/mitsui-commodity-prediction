@@ -17,6 +17,8 @@ from .features import FeatureConfig, make_target_features
 
 @dataclass
 class TargetModel:
+    """Everything required to reproduce one target's feature/model contract."""
+
     target: str
     pair: str
     model: Pipeline
@@ -24,6 +26,7 @@ class TargetModel:
 
 
 def make_ridge(alpha: float = 10.0) -> Pipeline:
+    """Build the baseline pipeline with imputation and scale normalization."""
     return Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median", keep_empty_features=True)),
@@ -44,6 +47,8 @@ def fit_target_models(
     feature_config: FeatureConfig = FeatureConfig(),
 ) -> dict[str, TargetModel]:
     """Fit one lightweight causal baseline model per official target."""
+    # target_pairs is the authoritative mapping from target name to the market
+    # columns that are allowed to describe it.
     pairs = target_pairs.set_index("target")
     targets = target_columns(labels.columns)
     if max_targets is not None:
@@ -55,6 +60,8 @@ def fit_target_models(
         x_all = make_target_features(market, pair, feature_config)
         y_all = pd.to_numeric(labels[target], errors="coerce")
 
+        # Combine the caller's chronological split with label availability.
+        # Feature NaNs are handled inside the sklearn pipeline.
         valid = np.zeros(len(market), dtype=bool)
         valid[train_indices] = True
         valid &= y_all.notna().to_numpy()
@@ -80,6 +87,8 @@ def predict_target_models(
     predictions: dict[str, np.ndarray] = {}
     for target, bundle in models.items():
         features = make_target_features(market, bundle.pair)
+        # Persisted column order is part of the model contract. Reindexing also
+        # protects inference from accidental feature-order changes.
         features = features.reindex(columns=bundle.feature_columns)
         predictions[target] = bundle.model.predict(features.iloc[indices])
     return pd.DataFrame(predictions, index=market.index[indices])

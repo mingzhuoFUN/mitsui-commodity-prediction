@@ -21,6 +21,12 @@ from .features import FeatureConfig, make_target_features
 
 @dataclass
 class StackedTargetModel:
+    """Serializable training result for one of the 424 prediction targets.
+
+    Besides fitted estimators, the bundle stores the exact pair, horizon and
+    feature order needed to recreate the training input during inference.
+    """
+
     target: str
     pair: str
     horizon: int
@@ -31,6 +37,7 @@ class StackedTargetModel:
 
 
 def _model_factory(name: str, random_state: int = 42) -> Callable[[], RegressorMixin]:
+    """Return a constructor so every OOF fold receives a fresh estimator."""
     if name == "ridge":
         return lambda: Pipeline(
             [
@@ -50,6 +57,8 @@ def _model_factory(name: str, random_state: int = 42) -> Callable[[], RegressorM
                         max_depth=6,
                         min_samples_leaf=8,
                         max_features=0.8,
+                        # Parallelism is controlled outside individual models
+                        # to avoid oversubscribing Colab CPU cores.
                         n_jobs=1,
                         random_state=random_state,
                     ),
@@ -101,7 +110,12 @@ def fit_stacked_models(
     max_targets: int | None = None,
     feature_config: FeatureConfig = FeatureConfig(),
 ) -> dict[str, StackedTargetModel]:
-    """Fit per-target base learners and a leakage-safe OOF meta learner."""
+    """Fit per-target base learners and a leakage-safe OOF meta learner.
+
+    The meta learner never sees predictions made by a base model on rows used
+    to fit that same base model. This is the key property that makes the
+    stacking score meaningful on chronological data.
+    """
     pairs = target_pairs.set_index("target")
     targets = target_columns(labels.columns)
     if max_targets is not None:
@@ -115,13 +129,19 @@ def fit_stacked_models(
         x = make_target_features(
             market, pair, feature_config, label=y, horizon=horizon
         )
+        # Preserve the caller's chronological order while removing rows whose
+        # official target is unavailable.
         usable = train_indices[y.iloc[train_indices].notna().to_numpy()]
         if len(usable) < 100:
             continue
 
         x_train = x.iloc[usable]
         y_train = y.iloc[usable]
+        # Rows not covered by an OOF validation fold remain NaN and are not
+        # allowed into meta-model training.
         oof = np.full((len(usable), len(base_names)), np.nan)
+        # gap=horizon separates each fold's training tail from its validation
+        # head, reducing overlap between forward-return label windows.
         splitter = TimeSeriesSplit(n_splits=n_splits, gap=horizon)
         for fold_train, fold_valid in splitter.split(x_train):
             for model_idx, name in enumerate(base_names):
@@ -129,10 +149,14 @@ def fit_stacked_models(
                 model.fit(x_train.iloc[fold_train], y_train.iloc[fold_train])
                 oof[fold_valid, model_idx] = model.predict(x_train.iloc[fold_valid])
 
+        # Require a prediction from every base learner for a complete stacking
+        # feature vector.
         meta_rows = np.isfinite(oof).all(axis=1)
         meta = Ridge(alpha=1.0)
         meta.fit(oof[meta_rows], y_train.iloc[meta_rows])
 
+        # OOF models exist only to train the meta learner. Refit each base
+        # learner on all usable rows for the model used at inference time.
         base_models: list[RegressorMixin] = []
         for name in base_names:
             model = _model_factory(name)()
@@ -157,7 +181,10 @@ def predict_stacked_models(
     labels: pd.DataFrame,
     indices: np.ndarray,
 ) -> pd.DataFrame:
+    """Predict selected rows with the stored base and meta models."""
     predictions: dict[str, np.ndarray] = {}
+    # Multiple targets can share the same pair. Cache pair-only market features
+    # once, then attach target-specific delayed-label features below.
     pair_feature_cache: dict[str, pd.DataFrame] = {}
     for target, bundle in models.items():
         label = labels[target] if target in labels else pd.Series(np.nan, index=market.index)
@@ -170,6 +197,7 @@ def predict_stacked_models(
             x[f"label__available_{extra_lag}"] = aligned_label.shift(
                 reveal_delay + extra_lag
             )
+        # Restore the exact feature schema seen during fitting.
         x = x.reindex(columns=bundle.feature_columns)
         base_predictions = np.column_stack(
             [model.predict(x.iloc[indices]) for model in bundle.base_models]
@@ -181,6 +209,7 @@ def predict_stacked_models(
 def save_stacked_models(
     models: dict[str, StackedTargetModel], path: str | Path
 ) -> None:
+    """Serialize all target bundles as one submission-time artifact."""
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("wb") as handle:
@@ -188,5 +217,6 @@ def save_stacked_models(
 
 
 def load_stacked_models(path: str | Path) -> dict[str, StackedTargetModel]:
+    """Load the artifact created by :func:`save_stacked_models`."""
     with Path(path).open("rb") as handle:
         return pickle.load(handle)

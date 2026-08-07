@@ -6,7 +6,11 @@ import pandas as pd
 
 
 def list_data_files(data_dir: str | Path) -> pd.DataFrame:
-    """Return a compact inventory of files in the official data directory."""
+    """Return a compact inventory of files in the official data directory.
+
+    The inventory is intentionally metadata-only: loading every competition
+    file just to inspect a data directory would waste memory in Colab.
+    """
     root = Path(data_dir)
     rows = []
     for path in sorted(root.rglob("*")):
@@ -24,7 +28,11 @@ def list_data_files(data_dir: str | Path) -> pd.DataFrame:
 
 
 def read_table(path: str | Path, **kwargs) -> pd.DataFrame:
-    """Read a CSV or parquet table by suffix."""
+    """Read a CSV or parquet table by suffix.
+
+    Keeping format dispatch in one place lets data-inspection scripts accept
+    either format without duplicating loader selection logic.
+    """
     table_path = Path(path)
     suffix = table_path.suffix.lower()
     if suffix == ".csv":
@@ -35,6 +43,10 @@ def read_table(path: str | Path, **kwargs) -> pd.DataFrame:
 
 
 def target_columns(columns: list[str] | pd.Index) -> list[str]:
-    """Return competition target columns in numeric target order."""
+    """Return competition target columns in numeric target order.
+
+    Lexicographic sorting would place ``target_10`` before ``target_2``.
+    Numeric ordering is required by the competition inference interface.
+    """
     names = [str(column) for column in columns if str(column).startswith("target_")]
     return sorted(names, key=lambda name: int(name.split("_", maxsplit=1)[1]))

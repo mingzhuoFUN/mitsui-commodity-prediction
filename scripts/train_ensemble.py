@@ -16,6 +16,7 @@ from mitsui.validation import holdout_indices
 
 
 def main() -> None:
+    """Train, validate and optionally refit the 424-target stacked ensemble."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/ensemble"))
@@ -28,10 +29,14 @@ def main() -> None:
     market = pd.read_csv(args.data_dir / "train.csv")
     labels = pd.read_csv(args.data_dir / "train_labels.csv")
     pairs = pd.read_csv(args.data_dir / "target_pairs.csv")
+    # Positional feature/label alignment is used below, so fail early instead
+    # of silently training against shifted dates.
     if not market["date_id"].equals(labels["date_id"]):
         raise ValueError("Market rows and official labels are not aligned")
 
     if args.fit_full:
+        # Submission models use every labeled row and therefore do not produce
+        # a holdout score in this invocation.
         train_idx = market.index.to_numpy()
         valid_idx = None
     else:
@@ -51,6 +56,7 @@ def main() -> None:
 
     report = {"n_models": len(models), "fit_full": args.fit_full}
     if valid_idx is not None:
+        # Keep target columns in the model-produced order for metric alignment.
         pred = predict_stacked_models(models, market, labels, valid_idx)
         truth = labels.loc[valid_idx, pred.columns].copy()
         truth.index = pred.index

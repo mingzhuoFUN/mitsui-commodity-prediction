@@ -8,6 +8,8 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class FeatureConfig:
+    """Shared feature horizons used by training and online inference."""
+
     return_lags: tuple[int, ...] = (1, 2, 3, 5, 10, 20)
     rolling_windows: tuple[int, ...] = (5, 20, 60)
 
@@ -18,6 +20,7 @@ def parse_pair(pair: str) -> list[str]:
 
 
 def _safe_log(series: pd.Series) -> pd.Series:
+    """Convert non-numeric and non-positive prices to missing before logging."""
     values = pd.to_numeric(series, errors="coerce").astype(float)
     return np.log(values.where(values > 0))
 
@@ -39,6 +42,9 @@ def make_target_features(
     if missing:
         raise KeyError(f"Pair columns missing from market data: {missing}")
 
+    # Forward fill is causal: at row t it only uses observations from t or
+    # earlier. Backward fill is deliberately avoided because it reads future
+    # market values.
     raw = market[columns].apply(pd.to_numeric, errors="coerce").ffill()
     features: dict[str, pd.Series] = {}
     logs: dict[str, pd.Series] = {}
@@ -48,6 +54,8 @@ def make_target_features(
         logs[column] = log_price
         features[f"{column}__log_level"] = log_price
 
+        # Log differences are additive through time and make assets with very
+        # different price scales easier to compare.
         one_day_return = log_price.diff()
         features[f"{column}__return_1"] = one_day_return
         for lag in config.return_lags:
@@ -59,6 +67,8 @@ def make_target_features(
             features[f"{column}__return_std_{window}"] = rolling.std()
 
     if len(columns) == 2:
+        # A target defined by two assets is naturally represented by their
+        # relative log-price spread, not only by two independent price paths.
         left, right = columns
         spread = logs[left] - logs[right]
         features["pair__log_spread"] = spread
@@ -72,11 +82,14 @@ def make_target_features(
         if horizon is None:
             raise ValueError("horizon is required when label features are enabled")
         aligned_label = pd.to_numeric(label, errors="coerce").reindex(market.index)
+        # A label is usable only after its forward return window has completed.
+        # The extra day matches the sequential gateway's reveal timing.
         reveal_delay = int(horizon) + 1
         for extra_lag in (0, 1, 2, 5):
             features[f"label__available_{extra_lag}"] = aligned_label.shift(
                 reveal_delay + extra_lag
             )
 
+    # Tree models and sklearn imputers can handle NaN, but not +/- infinity.
     result = pd.DataFrame(features, index=market.index)
     return result.replace([np.inf, -np.inf], np.nan)

@@ -24,11 +24,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Train the Ridge benchmark on the same chronological holdout."""
     args = parse_args()
     market = pd.read_csv(args.data_dir / "train.csv")
     labels = pd.read_csv(args.data_dir / "train_labels.csv")
     pairs = pd.read_csv(args.data_dir / "target_pairs.csv")
 
+    # A mismatch here would pair market row t with the wrong official target.
     if not market["date_id"].equals(labels["date_id"]):
         raise ValueError("train.csv and train_labels.csv date_id columns are not aligned")
 
@@ -44,6 +46,7 @@ def main() -> None:
         max_targets=args.max_targets,
     )
     predictions = predict_target_models(models, market, valid_idx)
+    # Mirror prediction columns exactly before computing a cross-target metric.
     truth = labels.loc[valid_idx, list(predictions.columns)].copy()
     truth.index = predictions.index
     dates = market.loc[valid_idx, "date_id"].to_numpy()
